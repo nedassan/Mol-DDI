@@ -13,6 +13,42 @@ import matplotlib.pyplot as plt
 from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
 from evaluation import evaluate_model
 
+def tanimoto_similarity_batch(molecule1, molecule2, atom_counts_1, atom_counts_2):
+    batch_size = len(atom_counts_1)
+    similarities = []
+
+    start_idx_1 = 0
+    start_idx_2 = 0
+
+    for i in range(batch_size):
+        num_atoms_1 = atom_counts_1[i]
+        num_atoms_2 = atom_counts_2[i]
+
+        end_idx_1 = start_idx_1 + num_atoms_1
+        end_idx_2 = start_idx_2 + num_atoms_2
+        
+        mol1_features = molecule1[start_idx_1:end_idx_1]
+        mol2_features = molecule2[start_idx_2:end_idx_2]
+
+        if num_atoms_1 < num_atoms_2:
+            padding = num_atoms_2 - num_atoms_1
+            mol1_features = torch.cat([mol1_features, torch.zeros(padding, mol1_features.size(1))], dim=0)
+
+        elif num_atoms_2 < num_atoms_1:
+            padding = num_atoms_1 - num_atoms_2
+            mol2_features = torch.cat([mol2_features, torch.zeros(padding, mol2_features.size(1))], dim=0)
+
+        intersection = torch.sum(mol1_features * mol2_features, dim=1)
+        union = torch.sum(mol1_features, dim=1) + torch.sum(mol2_features, dim=1) - intersection
+        
+        similarity = torch.sum(intersection) / torch.sum(union) if torch.sum(union) != 0 else torch.tensor(0.0)
+
+        similarities.append(similarity)
+
+        start_idx_1 = end_idx_1
+        start_idx_2 = end_idx_2
+
+    return torch.stack(similarities)
 
 def save_model_and_history(model, history, save_dir='model_checkpoints'):
 
@@ -82,10 +118,11 @@ def plot_training_curves(history, save_path=None):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def train(model, train_loader, num_epochs=10, device=None, save_dir='model_checkpoints', save_model = False, plot_training_curve = False):
+def train_contrastive(model, train_loader, num_epochs=10, device=None, alpha = 0.1, threshold = 0.1, save_dir='model_checkpoints', save_model = False, plot_training_curve = False):
     
     optimizer = optim.AdamW(model.parameters(), lr = 1e-4, weight_decay = 1e-2)
     loss_fn = torch.nn.BCELoss()
+    cosine_similarity = torch.nn.CosineSimilarity
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,14 +143,26 @@ def train(model, train_loader, num_epochs=10, device=None, save_dir='model_check
         
         progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}")
         for batch_idx, datapoint in enumerate(progress_bar):
-            molecule1, molecule2, num_atoms1, num_atoms2, label = datapoint
+            molecule1, molecule2, num_atoms_1, num_atoms_2, label = datapoint
             molecule1, molecule2 = molecule1.to(device), molecule2.to(device)
             label = label.to(device).unsqueeze(-1).float()
+
+            batch_tanimoto_similarity = tanimoto_similarity_batch(molecule1.x, molecule2.x, num_atoms_1, num_atoms_2)
             
             optimizer.zero_grad()
             output, embed_1, embed_2 = model(molecule1, molecule2)
+            
+            embedding_cosine_similarity = cosine_similarity(embed_1, embed_2)
 
-            batch_loss = loss_fn(output, label)
+            mask = torch.zeros_like(batch_tanimoto_similarity)
+            mask = (batch_tanimoto_similarity > threshold)
+            print(mask)
+            if mask.any():
+                contrastive_penalty = alpha * ((embedding_cosine_similarity - batch_tanimoto_similarity)**2)
+            else:
+                contrastive_penalty = 0
+
+            batch_loss = loss_fn(output, label) + contrastive_penalty
             total_loss += batch_loss.item()
             num_batches += 1
             
@@ -179,7 +228,7 @@ if __name__ == '__main__':
     )
 
     # Training
-    trained_model, training_history = train(
+    trained_model, training_history = train_contrastive(
         model=model,
         train_loader=train_loader,
         num_epochs=10,

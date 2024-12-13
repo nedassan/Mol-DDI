@@ -18,12 +18,14 @@ def custom_collate(batch):
         
     drug1_graphs = [item[0] for item in batch]
     drug2_graphs = [item[1] for item in batch]
-    labels = torch.tensor([item[2] for item in batch])
+    num_atoms1 = [item[2] for item in batch]
+    num_atoms2 = [item[3] for item in batch]
+    labels = torch.tensor([item[4] for item in batch])
     
     batched_drug1 = Batch.from_data_list(drug1_graphs)
     batched_drug2 = Batch.from_data_list(drug2_graphs)
     
-    return batched_drug1, batched_drug2, labels
+    return batched_drug1, batched_drug2, num_atoms1, num_atoms2, labels
 
 class StreamingDrugDataset(IterableDataset):
     def __init__(self, tsv_file: str, cache_dir: str = './cache', batch_size: int = 1000, 
@@ -54,7 +56,7 @@ class StreamingDrugDataset(IterableDataset):
             drug1_graph.num_nodes = drug1_graph.x.size(0)
             drug2_graph.num_nodes = drug2_graph.x.size(0)
             
-            return drug1_graph, drug2_graph, int(label)
+            return drug1_graph, drug2_graph, drug1_graph.num_nodes, drug2_graph.num_nodes, int(label)
         except Exception as e:
             print(f"Error converting SMILES: {e}")
             return None
@@ -78,7 +80,7 @@ class StreamingDrugDataset(IterableDataset):
         
         try:
             processed_data = []
-            for drug1_graph, drug2_graph, label in batch_data:
+            for drug1_graph, drug2_graph, num_atoms1, num_atoms2, label in batch_data:
                 drug1_dict = {
                     'x': drug1_graph.x.cpu(),
                     'edge_index': drug1_graph.edge_index.cpu(),
@@ -93,7 +95,7 @@ class StreamingDrugDataset(IterableDataset):
                     'num_nodes': drug2_graph.num_nodes
                 }
                 
-                processed_data.append((drug1_dict, drug2_dict, label))
+                processed_data.append((drug1_dict, drug2_dict, num_atoms1, num_atoms2, label))
             
             torch.save(processed_data, temp_path)
             
@@ -110,7 +112,7 @@ class StreamingDrugDataset(IterableDataset):
             batch_data = torch.load(cache_path, map_location='cpu', weights_only = True)
             processed_batch = []
             
-            for drug1_dict, drug2_dict, label in batch_data:
+            for drug1_dict, drug2_dict, num_atoms1, num_atoms2, label in batch_data:
                 drug1_graph = Data(
                     x=drug1_dict['x'],
                     edge_index=drug1_dict['edge_index'],
@@ -125,7 +127,7 @@ class StreamingDrugDataset(IterableDataset):
                     num_nodes=drug2_dict['x'].size(0)  
                 )
                 
-                processed_batch.append((drug1_graph, drug2_graph, label))
+                processed_batch.append((drug1_graph, drug2_graph, num_atoms1, num_atoms2, label))
                 
             return processed_batch
         except Exception as e:
@@ -150,7 +152,7 @@ class StreamingDrugDataset(IterableDataset):
                 continue
         return processed_data
 
-    def __iter__(self) -> Iterator[Tuple[Data, Data, int]]:
+    def __iter__(self) -> Iterator[Tuple[Data, Data, int, int, int]]:
         worker_info = torch.utils.data.get_worker_info()
         chunk_size = self.batch_size
         

@@ -22,11 +22,11 @@ def evaluate_model(model, test_loader, device=None):
     
     with torch.no_grad():
         for batch in tqdm(test_loader, desc="Evaluating"):
-            molecule1, molecule2, labels = batch
+            molecule1, molecule2, num_atoms_1, num_atoms_2, labels = batch
             molecule1, molecule2 = molecule1.to(device), molecule2.to(device)
             labels = labels.to(device).unsqueeze(-1).float()
             
-            outputs = model(molecule1, molecule2)
+            outputs, embed_1, embed_2 = model(molecule1, molecule2)
             batch_loss = loss_fn(outputs, labels)
             total_loss += batch_loss.item()
             num_batches += 1
