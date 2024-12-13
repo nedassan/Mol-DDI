@@ -41,10 +41,6 @@ Ensure all dependencies are installed:
 
 Modify the code in the entry point of train.py, initializing the desired model, then run the script. The evaluation loop and data processing will be called by the script. To visualize the embedding space, set the save_model flag to True during training, choose a directory to save to, then run embed_visualization.py and edit the entry point with the saved model, desired number of clusters, and desired number of randomly sampled molecules.
 
+To train with contrastive loss, use the train-contrastive script instead. The threshold for Tanimoto similarity is set to 0.1 (the 99% quantile in this dataset)
 
-
-
-
-
-
-#Mol-DDI
+gat_lstm was the best performing model, gat_lstm_sim_pen is the gat_lstm trained with contrastive loss
