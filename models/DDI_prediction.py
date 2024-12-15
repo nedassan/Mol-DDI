@@ -22,7 +22,7 @@ class FFNN(torch.nn.Module):
             return concat_embed
         
         pred_prob_ddi = self.fc(concat_embed)
-        return pred_prob_ddi
+        return pred_prob_ddi, embed_1, embed_2
     
 
 class CrossAttention(torch.nn.Module):
@@ -65,7 +65,7 @@ class FFNNAttn(torch.nn.Module):
             return attn_embed
         
         pred_prob_ddi = self.fc(attn_embed)
-        return pred_prob_ddi
+        return pred_prob_ddi, embed_1, embed_2
     
 class LSTM_DDI(torch.nn.Module):
     def __init__(self, gnn, embed_dim, hidden_dim, num_layers, activation_fn):
@@ -88,7 +88,7 @@ class LSTM_DDI(torch.nn.Module):
         if return_embed:
             return lstm_output
         
-        return pred_prob_ddi
+        return pred_prob_ddi, embed_1, embed_2
     
 class GRU_DDI(torch.nn.Module):
     def __init__(self, gnn, embed_dim, hidden_dim, num_layers, activation_fn):
@@ -110,4 +110,4 @@ class GRU_DDI(torch.nn.Module):
         if return_embed:
             return gru_output
         
-        return pred_prob_ddi
+        return pred_prob_ddi, embed_1, embed_2
