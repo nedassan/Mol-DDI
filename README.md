@@ -2,10 +2,37 @@
 
 Authors: Ne Dassanayake, Yiqing Du, Izzy Zhu
 
-This repository contains the code for Mol-DDI (Exploring Molecular Graphs for Drug-Drug Interaction Prediction), a final project for MIT's 6.7960 Deep Learning class. 
+This repository contains the code for Mol-DDI (Exploring Molecular Graphs for Drug-Drug Interaction Prediction), a final project for MIT's 6.7960 Deep Learning class. For detailed information about the methodology and results, please refer to index.html in the submission folder.
 
-A dataset consisting of SMILES encodings of drug pairs are passed into GNNs to generate embeddings. These embeddings are concatenated and fed into a downstream feedforward or memory network to output a predicted probability of interaction.
+A dataset consisting of SMILES encodings of drug pairs are passed into GNNs to generate embeddings. These embeddings are concatenated and fed into a downstream feedforward or memory network to output a predicted probability of interaction. A diagram of our pipeline is shown below.
 
+```mermaid
+flowchart LR
+    subgraph Input["Input Processing"]
+        D1["Drug 1 SMILES"] --> FP1["Morgan Fingerprint 1 + Edge Attributes"]
+        D2["Drug 2 SMILES"] --> FP2["Morgan Fingerprint 2 + Edge Attributes"]
+
+        D1 --> CHIRAL["Chiral Features"] -.-> FP2
+        D2 --> CHIRAL["Chiral Features"] -.-> FP1
+    end
+    
+    subgraph Processing["Graph Processing"]
+        FP1 --> GNN1["GNN<br>(GCN or GAT)"]
+        FP2 --> GNN2["GNN<br>(GCN or GAT)"]
+        GNN1 --> CONCAT["Concatenated<br>Embeddings"]
+        GNN2 --> CONCAT
+    end
+    
+    subgraph Prediction["Prediction Network"]
+        CONCAT --> DN["Downstream Network<br>(FFNN/LSTM/GRU/Attention)"]
+        DN --> OUT["Interaction<br>Prediction"]
+    end
+    
+    style Input fill:#f9f,stroke:#333
+    style Processing fill:#bbf,stroke:#333
+    style Prediction fill:#ddf,stroke:#333
+
+```
 
 ## Files
 
