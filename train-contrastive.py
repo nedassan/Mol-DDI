@@ -122,7 +122,7 @@ def train_contrastive(model, train_loader, num_epochs=10, device=None, alpha = 0
     
     optimizer = optim.AdamW(model.parameters(), lr = 1e-4, weight_decay = 1e-2)
     loss_fn = torch.nn.BCELoss()
-    cosine_similarity = torch.nn.CosineSimilarity
+    cosine_similarity = torch.nn.CosineSimilarity(dim = -1, eps = 1e-8)
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -155,10 +155,10 @@ def train_contrastive(model, train_loader, num_epochs=10, device=None, alpha = 0
             embedding_cosine_similarity = cosine_similarity(embed_1, embed_2)
 
             mask = torch.zeros_like(batch_tanimoto_similarity)
-            mask = (batch_tanimoto_similarity > threshold)
-            print(mask)
+            mask = (batch_tanimoto_similarity > threshold).float()
+
             if mask.any():
-                contrastive_penalty = alpha * ((embedding_cosine_similarity - batch_tanimoto_similarity)**2)
+                contrastive_penalty = torch.sum(alpha * ((embedding_cosine_similarity - batch_tanimoto_similarity)**2), dim = 0)
             else:
                 contrastive_penalty = 0
 
